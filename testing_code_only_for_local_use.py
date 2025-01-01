@@ -72,10 +72,10 @@ class Config:
 
 # Add new classes for metadata management
 class ColumnDefinition:
-    def __init__(self, hierarchy_level=None, distinct_values=None, description=None):
+    def __init__(self, description: str, hierarchy_level=None, distinct_values=None):
+        self.description = description
         self.hierarchy_level = hierarchy_level
         self.distinct_values = distinct_values or []
-        self.description = description
 
 class TableDefinition:
     def __init__(self, description, key_purposes, common_queries, relationships, columns=None):
@@ -99,32 +99,52 @@ class FinancialTableMetadata:
                     "Revenue by type",
                     "Expense analysis",
                     "Profit margins",
-                    "Room Capacity Analysis"
+                    "Common questions about the analysis"
                 ],
                 relationships={
                     "balance_sheet": "Impacts through P&L",
                     "forecast_sheet": "Actual vs forecast comparison"
                 },
                 columns = {
-                    "SQL_Account_Name": ColumnDefinition(
-                        hierarchy_level='none',
-                        distinct_values=['Operational Data', 'Replacement Reserve', 'Net Operating Income after Reserve', 'Revenue', 'Department Expenses', 'Department Profit (Loss', 'Undistributed Expenses', 'Gross Operating Profit', 'Management Fees', 'Income Before Non-Operating Inc & Exp', 'Non-Operating Income & Expenses', 'Total Non-Operating Income & Expenses', 'EBITDA', '-'],
-                        description="Main accounting categories for hotel operations including revenue, expenses, and profit metrics"
-                    ),
-                    "SQL_Account_Category_Order": ColumnDefinition(
-                        hierarchy_level='none',
-                        distinct_values=['Available Rooms', 'Rooms Sold', 'Occupancy %', 'Average Rate', 'RevPar', 'Replacement Reserve', 'NOI after Reserve', 'NOI Margin', 'Room Revenue', 'F&B Revenue', 'Other Revenue', 'Miscellaneous Income', 'Total Operating Revenue', 'Room Expense', 'F&B Expense', 'Other Expense', 'Total Department Expense', 'Department Profit (Loss)', 'A&G Expense', 'Information & Telecommunications', 'Sales & Marketing', 'Maintenance', 'Utilities', 'Total Undistributed Expenses', 'GOP', 'GOP Margin', 'Management Fees', 'Income Before Non-Operating Inc & Exp', 'Property & Other Taxes', 'Insurance', 'Other (Non-Operating I&E)', 'Total Non-Operating Income & Expenses', 'EBITDA'],
-                        description="Detailed breakdown of hotel performance metrics, ordered from operational statistics through financial results including occupancy, revenue, expenses, and profitability measures"
+                    "Operator": ColumnDefinition(
+                        description="Name of the operating entity or organization",
+                        hierarchy_level=1,
+                        distinct_values=['Marriott', 'HHM', 'Remington', '24/7']
                     ),
                     "SQL_Property": ColumnDefinition(
-                        hierarchy_level='none',
-                        distinct_values=['AC Wailea', 'Courtyard LA Pasadena Old Town', 'Courtyard Washington DC Dupont Circle', 'Hilton Garden Inn Bethesda', 'Marriott Crystal City', 'Moxy Washington DC Downtown', 'Residence Inn Pasadena', 'Residence Inn Westshore Tampa', 'Skyrock Inn Sedona', 'Steward\\xa0Santa\\xa0Barbara', 'Surfrider Malibu'],
-                        description="List of hotel properties in the portfolio, including various brands and locations across the United States"
+                        description="List of hotel properties in the portfolio, including various brands and locations across the United States",
+                        hierarchy_level=2,
+                        distinct_values=['AC Wailea', 'Courtyard LA Pasadena Old Town', 'Courtyard Washington DC Dupont Circle', 'Hilton Garden Inn Bethesda', 'Marriott Crystal City', 'Moxy Washington DC Downtown', 'Residence Inn Pasadena', 'Residence Inn Westshore Tampa', 'Skyrock Inn Sedona', 'Steward\\xa0Santa\\xa0Barbara', 'Surfrider Malibu']
+                    ),
+                    "SQL_Account_Name": ColumnDefinition(
+                        description="Main accounting categories for hotel operations including revenue, expenses, and profit metrics",
+                        hierarchy_level=3,
+                        distinct_values=['Operational Data', 'Replacement Reserve', 'Net Operating Income after Reserve', 'Revenue', 'Department Expenses', 'Department Profit (Loss', 'Undistributed Expenses', 'Gross Operating Profit', 'Management Fees', 'Income Before Non-Operating Inc & Exp', 'Non-Operating Income & Expenses', 'Total Non-Operating Income & Expenses', 'EBITDA', '-']
+                    ),
+                    "SQL_Account_Category_Order": ColumnDefinition(
+                        description="Detailed breakdown of hotel performance metrics, ordered from operational statistics through financial results including occupancy, revenue, expenses, and profitability measures",
+                        hierarchy_level=4,
+                        distinct_values=['Available Rooms', 'Rooms Sold', 'Occupancy %', 'Average Rate', 'RevPar', 'Replacement Reserve', 'NOI after Reserve', 'NOI Margin', 'Room Revenue', 'F&B Revenue', 'Other Revenue', 'Miscellaneous Income', 'Total Operating Revenue', 'Room Expense', 'F&B Expense', 'Other Expense', 'Total Department Expense', 'Department Profit (Loss)', 'A&G Expense', 'Information & Telecommunications', 'Sales & Marketing', 'Maintenance', 'Utilities', 'Total Undistributed Expenses', 'GOP', 'GOP Margin', 'Management Fees', 'Income Before Non-Operating Inc & Exp', 'Property & Other Taxes', 'Insurance', 'Other (Non-Operating I&E)', 'Total Non-Operating Income & Expenses', 'EBITDA']
+                    ),
+                    "Sub_Account_Category_Order": ColumnDefinition(
+                        description="Detailed breakdown of hotel performance metrics, ordered from operational statistics through financial results including occupancy, revenue, expenses, and profitability measures",
+                        hierarchy_level=5,
+                        distinct_values=['-', 'Replacement Reserve', 'EBITDA less REPLACEMENT RESERVE', 'Rooms', 'Food & Beverage', 'Other', 'Market', 'Rooms Other', 'Benefits/Bonus % Wages', 'Overtime Premium', 'Hourly Wages', 'Management Wages', 'FTG InRoom Services', 'Walked Guest', 'TA Commission', 'Cluster Reservation Cost', 'Comp F&B', 'Guest Supplies', 'Suite Supplies', 'Laundry', 'Cleaning Supplies', 'Linen', 'F&B Other', 'Service Charge Distribution', 'Beverage Cost', 'Food Cost', 'Other Sales Expense', 'Market Expense', 'A&G Other', 'Uniforms', 'Program Services Contribution', 'Transportation/Van Expense', 'Chargebacks', 'Employee Relations', 'Training', 'Postage', 'Bad Debt', 'Credit and Collection', 'Travel', 'Office Supplies', 'Pandemic Preparedness', 'Outside Labor Services', 'TOTAL I&TS CONT.', 'IT Compliance', 'FTG Internet', 'Guest Communications', 'Sales & Mkt. Other', 'Revenue Management', 'BT Booking Cost', 'Sales Shared Services', 'Loyalty', 'Marketing & eCommerce', 'Marketing Fund', 'PO&M Other', 'Cluster Engineering', 'PO&M NonContract', 'PO&M Contract', 'UTILITIES', 'Gross Operating Profit', 'Management Fees', 'Real Estate Tax', 'Over/Under Sales Tax', 'Property Insurance', 'Casualty Insurance', 'Other Investment Factors', 'Gain Loss Fx', 'Prior Year Adjustment', 'Lease Payments', 'Chain Services', 'Land Rent', 'Guest Accidents', 'Franchise Fees', 'System Fees', 'EBITDA', 'NOI after Reserve', 'Net Income', 'Other Operated Departments', 'Administrative & General', 'ADMINISTRATIVE & GENERAL', 'INFORMATION & TELECOMM.', 'Information & Telecommunications', 'FRANCHISE FEES', 'Sales & Marketing', 'Available Rooms', 'Property Operations & Maintenance', 'Utilities', 'Property & Other Taxes', 'Real Estate Property Tax', 'Personal Property Tax', 'Business Tax', 'Insurance - Property', 'Insurance General', 'Cyber Insurance', 'Employment Practices Insurance', 'Insurance', 'Professional Services', 'Legal & Accounting', 'Interest', 'Interest Expense-other', 'Lease Income', 'Total Food and Beverage', 'Total Other Operated Departments', 'Miscellaneous Income', 'Minor Ops', 'Franchise Taxes Owner', 'Other Expense', 'Total Other Operated Departments Expense', 'Miscellaneous Expense', 'Information & Telecommunications Sys.', 'MANAGEMENT FEE', 'REAL ESTATE/OTHER TAXES', 'HOTEL BED TAX CONTR', 'Property & Other taxes', 'Income', 'Rent & Leases', 'FFE Replacement Exp', 'Ownership Expense Owner', 'Depreciation and Amortization', 'Owner Expenses', 'EXTERNAL AUDIT FEES', 'DEFERRED MAINT. PRE-OPENING', 'COMMON AREA', 'Rent', 'RENT BASE', 'RENT VARIABLE', 'TRS LATE FEE', 'RATELOCK EXPENSE', 'BUDGET VARIANCE', 'CORPORATE OVERHEAD', 'OFFICE BLDG CASH FL', 'PROF SVCS-LEGAL', 'PROF SVCS', 'PROF SVCS-ENVIRONMENTAL', 'PROF SVCS-ACCOUNTING', 'PROF SVCS-OTHER', 'BAD DEBT EXPENSE', 'INCENTIVE MANAGEMENT FEE', 'PRE-OPENING EXPENSE', 'AMORTIZATION EXPENSE', 'OID W/O', 'PROCEEDS FROM CONVERSION', 'BASIS OF N/R', 'LONG TERM CAPITAL GAIN', 'OVERHEAD ALLOCATION', 'INTEREST EXPENSE', 'Asset Management Fee', 'Rent & Other Property/Equipment', 'Marketing Training', 'Prior Year Adj Tax', 'Property Tax', 'ASSET MANAGEMENT FEES', 'Management Fee Expense', 'NET OPERATING INCOME', 'ROOMS', 'FOOD & BEVERAGE', 'OTHER INCOME', 'SALES & MARKETING', 'REPAIRS & MAINTENANCE', 'PROPERTY TAX', 'PERSONAL PROPERTY TAX', 'LIABILITY INSURANCE', 'EQUIPMENT LEASES', "OWNER'S EXPENSE", 'LOAN INTEREST', 'ASSET MANAGEMENT FEE', 'REPLACEMENT RESERVES', 'Minibar', 'Mini Bar', 'Info & Telecom Systems', 'Property Operations', 'Interest Expense', 'Owner Expense', 'Reserve for Replacement']
+                    ),
+                    "SQL_Account_Group_Name": ColumnDefinition(
+                        description=" ",
+                        hierarchy_level=6,
+                        distinct_values=['-', 'EBITDA less REPLACEMENT RESERVE', 'Rooms', 'Food & Beverage', 'Other', 'Guest Communications', 'Market', 'Rooms Other', 'Incentive Expense', 'Payroll Taxes', "Workers' Comp", 'Bonus', 'Medical', 'Overtime Premium', 'Hourly Wages', 'Management Wages', 'FTG InRoom Services', 'Walked Guest', 'TA Commission', 'Cluster Reservation Cost', 'Comp F&B', 'Guest Supplies', 'Suite Supplies', 'Laundry', 'Cleaning Supplies', 'Linen', 'F&B Other', 'Service Charge Distribution', 'Beverage Cost', 'Food Cost', 'Other Sales Expense', 'Market Expense', 'Uniforms', 'CAS System Support', 'Over/Short', 'A&G Other', 'Program Services Contribution', 'Transportation/Van Expense', 'Chargebacks', 'Employee Relations', 'Training', 'Postage', 'Bad Debt', 'Credit and Collection', 'Travel', 'Office Supplies', 'Pandemic Preparedness', 'Outside Labor Services', 'TOTAL I&TS CONT.', 'IT Compliance', 'FTG Internet', 'Sales Executive Share', 'Sales Exec Overhead Dept', 'Revenue Management', 'BT Booking Cost', 'Sales Shared Services', 'Loyalty', 'Marketing & eCommerce', 'Marketing Fund', 'PO&M Other', 'Cluster Engineering', 'PO&M NonContract', 'PO&M Contract', 'UTILITIES', 'Water/Sewer', 'Gas', 'Electricity', 'Gross Operating Profit', 'Real Estate Tax', 'Over/Under Sales Tax', 'Property Insurance', 'Casualty Insurance', 'Other Investment Factors', '71132 Common Area Chgs', 'Gain Loss Fx', 'Prior Year Adjustment', 'Lease Payments', 'Chain Services', 'Land Rent', 'Guest Accidents', 'Franchise Fees', 'System Fees', 'EBITDA', 'Marketing Training', 'Prior Year Adj Tax', 'Property Tax']
+                    ),
+                    "Current_Actual_Month": ColumnDefinition(
+                        description=" "
+                    ),
+                    "YoY_Change": ColumnDefinition(
+                        description=" "
                     ),
                     "Month": ColumnDefinition(
-                        hierarchy_level='none',
-                        distinct_values=['2024-10-01', '2024-08-01', '2024-09-01', '2024-07-01', '2024-06-01', '2024-04-01', '2022-11-01', '2024-05-01', '2022-05-01', '2022-03-01', '2022-02-01', '2021-12-01', '2023-03-01', '2023-01-01', '2023-04-01', '2023-02-01', '2024-01-01', '2023-12-01', '2024-02-01', '2022-12-01', '2022-10-01', '2023-10-01', '2023-09-01', '2023-08-01', '2023-11-01', '2022-08-01', '2022-06-01', '2022-04-01', '2022-07-01', '2022-09-01', '2022-01-01', '2021-11-01', '2021-10-01', '2021-08-01', '2023-06-01', '2023-05-01', '2023-07-01', '2021-09-01', '2024-03-01', '2021-05-01', '2021-06-01', '2021-07-01', '2021-03-01', '2021-04-01', '2021-02-01', '2021-01-01'],
-                        description="Time period for the data, ranging from January 2021 through October 2024, stored in YYYY-MM-DD format"
+                        description="Time period for the data in YYYY-MM-DD format. When querying specific months (e.g., 'June 2024'), use format '2024-06-01' in SQL. Supports dates from January 2021 through October 2024. For month-specific queries, use strftime or date functions to match the format.",
+                        distinct_values=['2024-10-01', '2024-08-01', '2024-09-01', '2024-07-01', '2024-06-01', '2024-04-01', '2022-11-01', '2024-05-01', '2022-05-01', '2022-03-01', '2022-02-01', '2021-12-01', '2023-03-01', '2023-01-01', '2023-04-01', '2023-02-01', '2024-01-01', '2023-12-01', '2024-02-01', '2022-12-01', '2022-10-01', '2023-10-01', '2023-09-01', '2023-08-01', '2023-11-01', '2022-08-01', '2022-06-01', '2022-04-01', '2022-07-01', '2022-09-01', '2022-01-01', '2021-11-01', '2021-10-01', '2021-08-01', '2023-06-01', '2023-05-01', '2023-07-01', '2021-09-01', '2024-03-01', '2021-05-01', '2021-06-01', '2021-07-01', '2021-03-01', '2021-04-01', '2021-02-01', '2021-01-01']
                     )
                 }
             )
@@ -300,7 +320,7 @@ class DatabaseAnalyst:
             if match:
                 selected_tables = json.loads(match.group())
                 print(f"Selected tables: {selected_tables}")
-                return selected_tables
+                return selected_tables 
             print("No tables selected")
             return []
         except Exception as e:
@@ -308,10 +328,10 @@ class DatabaseAnalyst:
             return []
 
     def _analyze_column_requirements(self, query: str, selected_tables: List[str]) -> Dict[str, List[str]]:
-        """Step 2: Analyze which columns are needed based on hierarchy, distinct values, and descriptions. Ensure that your SQL code uses only the distinct values present in the specified columns. Understand the purpose of each column to avoid including unrelated values."""
+        """Step 2: Analyze which columns are needed based on hierarchy and descriptions."""
         print(f"\nStep 2: Analyzing column requirements for tables: {selected_tables}")
         columns_prompt = f"Given this user question: {query}\n\n"
-        columns_prompt += "And these table columns with their hierarchies, distinct values, and descriptions:\n\n"
+        columns_prompt += "And these table columns with their descriptions:\n\n"
         
         for table_name in selected_tables:
             table = self.metadata.tables.get(table_name)
@@ -319,17 +339,20 @@ class DatabaseAnalyst:
                 columns_prompt += f"\nTable: {table_name}\n"
                 for col_name, col_def in table.columns.items():
                     columns_prompt += f"\nColumn: {col_name}\n"
-                    columns_prompt += f"Hierarchy Level: {col_def.hierarchy_level}\n"
-                    if col_def.distinct_values:
-                        columns_prompt += f"Possible Values: {', '.join(str(v) for v in col_def.distinct_values)}\n"
                     columns_prompt += f"Description: {col_def.description}\n"
+                    # Only include hierarchy level if it exists and is relevant
+                    if col_def.hierarchy_level and col_def.hierarchy_level != 'none':
+                        columns_prompt += f"Hierarchy Level: {col_def.hierarchy_level}\n"
+                    # Only include a sample of distinct values if they exist
+                    if col_def.distinct_values and len(col_def.distinct_values) > 0:
+                        sample_size = min(5, len(col_def.distinct_values))
+                        samples = col_def.distinct_values[:sample_size]
+                        columns_prompt += f"Example Values: {', '.join(str(v) for v in samples)}\n"
         
         columns_prompt += "\nReturn a JSON object mapping table names to needed columns. Example:"
         columns_prompt += '\n{"table1": ["column1", "column2"], "table2": ["column3"]}'
         
         print("Sending column analysis prompt to LLM...")
-        print("Prompt sent to LLM:")
-        print(columns_prompt)  # Log the prompt being sent
         response = self.llm.invoke([HumanMessage(content=columns_prompt)])
         try:
             match = re.search(r'{.*}', response.content, re.DOTALL)
@@ -344,16 +367,24 @@ class DatabaseAnalyst:
             return {}
 
     def _generate_sql_query(self, query: str, table_columns: Dict[str, List[str]]) -> str:
-        """Step 3: Generate SQL query based on selected tables and columns"""
+        """Step 3: Generate SQL query based on selected tables and columns. Ensure that your SQL code uses only the distinct values present in the specified columns.  If a value is not present in the column, do not write WHERE clause using that value and that column."""
         print(f"\nStep 3: Generating SQL query for: {query}")
-        print(f"Using tables and columns: {table_columns}")
         
-        sql_prompt = f"Generate a SQL query for this question: {query}\n\n"
-        sql_prompt += "Using these tables and columns:\n"
-        
-        for table, columns in table_columns.items():
-            sql_prompt += f"\nTable: {table}\n"
-            sql_prompt += f"Columns: {', '.join(columns)}\n"
+        # Create a more concise prompt
+        sql_prompt = f"""Generate a SQL query for: {query}
+
+Tables and columns to use:
+{json.dumps(table_columns, indent=2)}
+
+Important Notes:
+1. Month format: YYYY-MM-DD (e.g., '2024-06-01' for June 2024)
+2. Month matching:
+   - "June 2024" → Month = '2024-06-01'
+   - "June" → strftime('%m', Month) = '06'
+   - "2024" → strftime('%Y', Month) = '2024'
+
+Generate SQL with correct date handling.
+"""
         
         print("Sending SQL generation prompt to LLM...")
         response = self.llm.invoke([HumanMessage(content=sql_prompt)])
@@ -362,13 +393,19 @@ class DatabaseAnalyst:
         return sql
 
     def _analyze_results(self, query: str, results: List[Dict]) -> str:
-        """Step 4: Analyze results if needed"""
+        """Step 4: Analyze results with a more concise prompt"""
         print(f"\nStep 4: Analyzing results for query: {query}")
-        print(f"Results to analyze: {results}")
         
-        analysis_prompt = f"Analyze these results for the question: {query}\n\n"
-        analysis_prompt += f"Results:\n{json.dumps(results, indent=2)}\n\n"
-        analysis_prompt += "Provide a clear, natural language analysis focusing on key insights."
+        # Limit the number of results included in the prompt
+        max_results = 10
+        truncated_results = results[:max_results] if len(results) > max_results else results
+        
+        analysis_prompt = (
+            f"Analyze these results for: {query}\n\n"
+            f"Results (showing {len(truncated_results)} of {len(results)} rows):\n"
+            f"{json.dumps(truncated_results, indent=2)}\n\n"
+            "Provide a clear, concise analysis of key insights."
+        )
         
         print("Sending analysis prompt to LLM...")
         response = self.llm.invoke([HumanMessage(content=analysis_prompt)])
@@ -520,12 +557,19 @@ class DatabaseAnalyst:
         return result
 
     def redo_analysis(self, query: str, clear_cache: bool = True) -> Dict:
-        """Redo analysis with option to clear cache"""
+        """Redo analysis with optimized prompts"""
         if clear_cache:
             cache_key = self.get_cache_key(query)
             if cache_key in self.query_cache:
                 del self.query_cache[cache_key]
-        return self.process_query(query)
+        
+        try:
+            return self.process_query(query)
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Analysis failed: {str(e)}"
+            }
 
     def _get_relevant_columns_metadata(self, selected_tables: List[str]) -> str:
         """Get detailed column metadata only for selected tables"""
