@@ -1,0 +1,21 @@
+# Core dependencies
+langchain-anthropic
+langchain
+langchain-community
+langgraph
+anthropic
+streamlit
+
+# Data handling
+pandas
+numpy
+
+# Database
+sqlalchemy
+
+# Typing and utilities
+typing-extensions
+python-dotenv
+
+# Optional but recommended
+tqdm
