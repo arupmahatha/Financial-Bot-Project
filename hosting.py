@@ -132,7 +132,7 @@ class FinancialTableMetadata:
                     ),
                     "SQL_Property": ColumnDefinition(
                         description="List of hotel properties in the portfolio, including various brands and locations across the United States. Every property is managed by an operator. hierarchy_level=2",
-                        distinct_values=['AC Wailea', 'Courtyard LA Pasadena Old Town', 'Courtyard Washington DC Dupont Circle', 'Hilton Garden Inn Bethesda', 'Marriott Crystal City', 'Moxy Washington DC Downtown', 'Residence Inn Pasadena', 'Residence Inn Westshore Tampa', 'Skyrock Inn Sedona', 'Steward\\xa0Santa\\xa0Barbara', 'Surfrider Malibu']
+                        distinct_values=['AC Wailea', 'Courtyard LA Pasadena Old Town', 'Courtyard Washington DC Dupont Circle', 'Hilton Garden Inn Bethesda', 'Marriott Crystal City', 'Moxy Washington DC Downtown', 'Residence Inn Pasadena', 'Residence Inn Westshore Tampa', 'Skyrock Inn Sedona', 'Steward Santa Barbara', 'Surfrider Malibu']
                     ),
                     "SQL_Account_Name": ColumnDefinition(
                         description="This column categorizes financial data into various account types, including operational data, reserves, income, expenses, profits, and fees. It also includes categories for non-operating income and expenses, as well as EBITDA. hierarchy_level=3",

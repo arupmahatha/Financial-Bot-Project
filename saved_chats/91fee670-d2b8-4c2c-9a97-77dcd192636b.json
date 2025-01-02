@@ -1,0 +1,28 @@
+{
+  "id": "91fee670-d2b8-4c2c-9a97-77dcd192636b",
+  "title": "what is the total revenue for ac wailea for the mo...",
+  "first_query": "what is the total revenue for ac wailea for the month of November 2023?",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "👋 Hello! I'm your SQL Database Analysis Assistant. \n\nI can help you analyze your database by:\n- Running SQL queries\n- Providing data insights\n- Answering follow-up questions about the results\n\nPlease ask me any question about your database!"
+    },
+    {
+      "role": "user",
+      "content": "what is the total revenue for ac wailea for the month of November 2023?"
+    },
+    {
+      "role": "assistant",
+      "content": "❌ Error: Query processing error: Selected table 'bookings' not found in metadata"
+    },
+    {
+      "role": "user",
+      "content": "what is the total revenue for ac wailea for the month of November 2023?\n\n"
+    },
+    {
+      "role": "assistant",
+      "content": "❌ Error: Query processing error: Selected table 'bookings' not found in metadata"
+    }
+  ],
+  "timestamp": "2025-01-02T22:23:02.092411"
+}
