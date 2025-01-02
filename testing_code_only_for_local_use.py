@@ -17,7 +17,7 @@ import time
 from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
 import sqlite3
 import re
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationSummaryMemory
 import streamlit as st
 from langgraph.graph import StateGraph, END
 from langchain.tools.sql_database.tool import QuerySQLDataBaseTool
@@ -37,6 +37,8 @@ from nltk.tag import pos_tag
 import nltk
 import itertools
 import ssl
+import traceback
+import diskcache
 
 # Add this after your imports
 try:
@@ -196,8 +198,17 @@ class DatabaseAnalyst:
             max_tokens=4096
         )
         
-        # Initialize cache
-        self.cache = {}
+        # Initialize caches
+        self.query_cache = diskcache.Cache('.query_cache')
+        self.prompt_cache = diskcache.Cache('.prompt_cache')
+        
+        # Initialize conversation memory with summary
+        self.memory = ConversationSummaryMemory(
+            llm=self.llm,
+            max_token_limit=2000,
+            memory_key="chat_history",
+            return_messages=True
+        )
         
         # Initialize database connection
         try:
@@ -245,58 +256,87 @@ class DatabaseAnalyst:
             print(f"❌ {error_msg}")
             return False, None, error_msg
 
-    def _process_single_query(self, query_info: Dict) -> Dict:
+    def _process_single_query(self, query_info: Union[str, Dict]) -> Dict:
         """Process a single query or sub-query"""
         try:
-            print(f"\nProcessing query: {query_info['query']}")
-            print("Entities found:", json.dumps(query_info['entities'], indent=2))
+            # Standardize query_info structure
+            if isinstance(query_info, str):
+                query_text = query_info
+                entities = self._extract_entities(query_text)
+            else:
+                query_text = query_info.get('query', '')
+                entities = query_info.get('entities', [])
+
+            print(f"\nProcessing query: {query_text}")
             
             # Generate SQL using entity information
-            sql_query = self._generate_sql_query(query_info)
+            query_data = {'query': query_text, 'entities': entities}
+            sql_query = self._generate_sql_query(query_data)
             
             # Execute SQL
             print("\nExecuting SQL...")
             success, results, error = self._execute_sql(sql_query)
             
-            if success:
+            if success and results:
                 metrics = {}
-                if results:
-                    print("\nQuery Results:")
-                    for row in results:
-                        if len(row) == 2:
-                            metrics[str(row[0])] = row[1]
-                            print(f"• {row[0]}: {row[1]}")
-                        else:
-                            metrics[f"Result_{len(metrics)}"] = row[0]
-                            print(f"• Result: {row[0]}")
+                print("\nQuery Results:")
+                
+                # Convert results to a list of dictionaries
+                formatted_results = []
+                for row in results:
+                    if isinstance(row, sqlite3.Row):
+                        row_dict = dict(row)
+                        formatted_results.append(row_dict)
+                        print(f"• {row_dict}")
+                    else:
+                        row_dict = {"value": row[0]} if len(row) == 1 else {str(row[0]): row[1]}
+                        formatted_results.append(row_dict)
+                        print(f"• {row_dict}")
+                
+                # Store both the raw metrics and formatted results
+                metrics = {
+                    "raw_data": formatted_results,
+                    "summary": {
+                        "total_records": len(formatted_results),
+                        "columns": list(formatted_results[0].keys()) if formatted_results else []
+                    }
+                }
                 
                 # Generate analysis
-                analysis_text = self._analyze_results(query_info['query'], metrics)
+                analysis_text = self._analyze_results(query_text, formatted_results)
                 
                 return {
                     "success": True,
-                    "query": query_info['query'],
-                    "entities": query_info['entities'],
+                    "query": query_text,
+                    "entities": entities,
                     "sql_query": sql_query,
                     "metrics": metrics,
+                    "formatted_results": formatted_results,
                     "analysis": analysis_text
                 }
             else:
                 return {
                     "success": False,
-                    "error": error,
-                    "query": query_info['query'],
-                    "entities": query_info['entities'],
-                    "sql_query": sql_query
+                    "error": error or "No results returned",
+                    "query": query_text,
+                    "entities": entities,
+                    "sql_query": sql_query,
+                    "metrics": {},
+                    "formatted_results": [],
+                    "analysis": ""
                 }
                 
         except Exception as e:
             error_msg = f"Query processing error: {str(e)}"
             print(f"❌ {error_msg}")
+            traceback.print_exc()
             return {
                 "success": False,
                 "error": error_msg,
-                "query": query_info['query']
+                "query": query_text,
+                "metrics": {},
+                "formatted_results": [],
+                "analysis": ""
             }
 
     def _combine_results(self, results: List[Dict], original_query: str) -> Dict:
@@ -369,30 +409,53 @@ class DatabaseAnalyst:
         
         return None
 
+    def _cache_prompt(self, prompt: str, response: str):
+        """Cache a prompt and its response"""
+        cache_key = hashlib.md5(prompt.encode()).hexdigest()
+        self.prompt_cache[cache_key] = {
+            'response': response,
+            'timestamp': time.time()
+        }
+
+    def _get_cached_prompt(self, prompt: str) -> Optional[str]:
+        """Get cached prompt response if available"""
+        cache_key = hashlib.md5(prompt.encode()).hexdigest()
+        cached_data = self.prompt_cache.get(cache_key)
+        
+        if cached_data:
+            # Check if cache is still valid (24 hours)
+            if time.time() - cached_data['timestamp'] < 86400:
+                return cached_data['response']
+        return None
+
     def process_query(self, query: str) -> Dict:
-        """Process query with caching"""
+        """Process query with enhanced caching"""
         try:
             print("\n" + "="*50)
             print(f"Processing Query: {query}")
             print("="*50)
             
-            # Check cache first
-            cached_result = self._get_cached_result(query)
+            # Check query cache first
+            cache_key = hashlib.md5(query.encode()).hexdigest()
+            cached_result = self.query_cache.get(cache_key)
+            
             if cached_result:
-                print("Using cached result")
+                print("Using cached query result")
+                # Update conversation memory
+                self.memory.save_context(
+                    {"input": query},
+                    {"output": cached_result.get('analysis', '')}
+                )
                 return cached_result
             
-            # If not cached, process normally
-            sub_queries = self.query_decomposer.decompose_query(query)
-            print("\n📋 Query Decomposition:")
-            for idx, sub_query in enumerate(sub_queries, 1):
-                print(f"\nSub-query {idx}: {sub_query['query']}")
-                print("Entities found:")
-                for entity in sub_query.get('entities', []):  # Use .get() with default empty list
-                    if isinstance(entity, dict):  # Check if entity is a dictionary
-                        print(f"• {entity.get('text', '')} ({entity.get('table', '')}.{entity.get('column', '')})")
-                    else:
-                        print(f"• {entity}")  # Handle case where entity is a string
+            # Get conversation history
+            chat_history = self.memory.load_memory_variables({})
+            
+            # Add chat history to decomposition context
+            sub_queries = self.query_decomposer.decompose_query(
+                query, 
+                chat_history.get("chat_history", [])
+            )
             
             # Process each sub-query
             results = []
@@ -406,8 +469,14 @@ class DatabaseAnalyst:
             else:
                 final_result = results[0] if results else {"success": False, "error": "No results generated"}
             
-            # Cache the result
-            self._cache_result(query, final_result)
+            # Cache the final result
+            self.query_cache[cache_key] = final_result
+            
+            # Update conversation memory
+            self.memory.save_context(
+                {"input": query},
+                {"output": final_result.get('analysis', '')}
+            )
             
             print("\n" + "="*50)
             print("Final Results:")
@@ -422,9 +491,9 @@ class DatabaseAnalyst:
             return {
                 "success": False,
                 "error": error_msg,
-                "metrics": {},  # Add empty metrics to avoid KeyError
-                "entities": [],  # Add empty entities list
-                "sql_query": ""  # Add empty SQL query
+                "metrics": {},
+                "entities": [],
+                "sql_query": ""
             }
 
     def _extract_sql(self, text: str) -> str:
@@ -582,7 +651,7 @@ For example, just return: final_income_sheet_new_seq
         return selected_table, table_metadata
 
     def _generate_sql_query(self, query_info: Dict) -> str:
-        """Generate SQL using column metadata and entity matching."""
+        """Generate SQL with prompt caching"""
         query = query_info['query']
         entities = query_info['entities']
         
@@ -649,7 +718,7 @@ For example, just return: final_income_sheet_new_seq
                 hierarchy_info.append(f"Level {level}: {', '.join(columns_at_level)}")
         
         # Create the SQL generation prompt
-        sql_prompt = f"""Generate a SQL query for: {query}
+        sql_prompt = f"""Generate a SQL query for: {query_info['query']}
 
 Table: {table_name}
 
@@ -674,6 +743,12 @@ Important Rules:
 Generate a SQL query that accurately answers the question while following these rules.
 """
 
+        # Check prompt cache
+        cached_response = self._get_cached_prompt(sql_prompt)
+        if cached_response:
+            print("\nUsing cached SQL generation")
+            return self._extract_sql(cached_response)
+
         # Add debugging information
         print("\nTable Selected:", table_name)
         print("\nEntity-Column Matches:")
@@ -689,6 +764,9 @@ Generate a SQL query that accurately answers the question while following these 
 4. Generates valid SQL for financial analysis"""),
             HumanMessage(content=sql_prompt)
         ])
+        
+        # Cache the response
+        self._cache_prompt(sql_prompt, response.content)
         
         sql = self._extract_sql(response.content)
         
@@ -712,53 +790,87 @@ Generate a SQL query that accurately answers the question while following these 
 
     def format_output(self, results: Dict) -> str:
         """Format the output for display"""
-        output = []
-        
-        if not results.get("success", False):
-            return f"❌ Error: {results.get('error', 'Unknown error occurred')}"
-        
-        output.append("🎯 Results:")
-        output.append("-" * 30)
-        
-        if results.get("entities"):
-            output.append("\n📋 Recognized Entities:")
-            for entity in results["entities"]:
-                output.append(f"• {entity['text']} ({entity['table']}.{entity['column']})")
-                if 'match_type' in entity:
-                    output.append(f"  Match Type: {entity['match_type']}")
-        
-        if results.get("sql_query"):
-            output.append("\n💻 Generated SQL:")
-            output.append(results["sql_query"])
-        
-        if results.get("metrics"):
-            output.append("\n📊 Metrics:")
-            for key, value in results["metrics"].items():
-                output.append(f"• {key}: {value}")
-        
-        if results.get("analysis"):
-            output.append("\n📝 Analysis:")
-            output.append(results["analysis"])
-        
-        return "\n".join(output)
+        try:
+            output = []
+            
+            if not results.get("success", False):
+                return f"❌ Error: {results.get('error', 'Unknown error occurred')}"
+            
+            # Add query for context
+            output.append(f"🔍 **Query**: {results.get('query', '')}\n")
+            
+            # Format results
+            if results.get("formatted_results"):
+                output.append("📊 **Results**:")
+                output.append("-" * 30)
+                for row in results["formatted_results"]:
+                    for key, value in row.items():
+                        formatted_value = f"{value:,.2f}" if isinstance(value, (int, float)) else value
+                        output.append(f"• **{key}**: {formatted_value}")
+                output.append("")  # Add spacing
+            
+            # Format analysis
+            if results.get("analysis"):
+                output.append("📝 **Analysis**:")
+                output.append("-" * 30)
+                # Split analysis into paragraphs and format each properly
+                analysis_parts = results["analysis"].split('\n')
+                for part in analysis_parts:
+                    if part.strip():
+                        if part.strip().startswith(('1.', '2.', '3.')):
+                            output.append(f"\n**{part.strip()}**")
+                        elif part.strip().startswith('-'):
+                            output.append(part.strip())
+                        else:
+                            output.append(part.strip())
+                output.append("")
+            
+            # Format SQL query
+            if results.get("sql_query"):
+                output.append("💻 **SQL Query**:")
+                output.append("-" * 30)
+                output.append(f"```sql\n{results['sql_query']}\n```")
+            
+            return "\n".join(output)
+            
+        except Exception as e:
+            error_msg = f"Output formatting error: {str(e)}"
+            print(f"❌ {error_msg}")
+            traceback.print_exc()
+            return f"Error formatting output: {str(e)}"
 
-    def _analyze_results(self, query: str, metrics: Dict) -> str:
+    def _analyze_results(self, query: str, results: List[Dict]) -> str:
         """Generate detailed analysis of the results"""
-        analysis_prompt = f"""Analyze these results for the query: "{query}"
+        try:
+            analysis_prompt = f"""Analyze these results for the query: "{query}"
 
 Results:
-{json.dumps(metrics, indent=2)}
+{json.dumps(results, indent=2)}
 
 Please provide:
 1. A clear interpretation of the numbers
-2. Any notable insights
-3. Context about the metrics shown
+2. Any notable insights or trends
+3. Context about what these metrics mean
 
-Response should be clear and concise but informative."""
+Keep the response clear and concise but informative."""
 
-        print("\n🤔 Generating Analysis...")
-        response = self.llm.invoke([HumanMessage(content=analysis_prompt)])
-        return response.content
+            print("\n🤔 Generating Analysis...")
+            print(f"Analysis Input: {json.dumps(results, indent=2)}")
+            
+            response = self.llm.invoke([
+                SystemMessage(content="You are a financial analyst providing clear, concise analysis of database query results."),
+                HumanMessage(content=analysis_prompt)
+            ])
+            
+            analysis = response.content if response else "No analysis generated."
+            print(f"\nGenerated Analysis: {analysis}")
+            return analysis
+            
+        except Exception as e:
+            error_msg = f"Analysis generation error: {str(e)}"
+            print(f"❌ {error_msg}")
+            traceback.print_exc()
+            return f"Unable to generate analysis: {str(e)}"
 
 class EntityStore:
     def __init__(self):
@@ -773,12 +885,30 @@ class QueryDecomposer:
     def __init__(self, llm: ChatAnthropic):
         self.llm = llm
 
-    def decompose_query(self, query: str) -> List[Dict]:
-        """Decompose complex query."""
+    def decompose_query(self, query: str, chat_history: List[Dict] = None) -> List[Dict]:
+        """Decompose complex query with chat history context."""
+        # Format chat history for context
+        history_context = ""
+        if chat_history:
+            # Handle chat history as a list of messages
+            if isinstance(chat_history, list):
+                history_context = "\nPrevious conversation:\n"
+                for msg in chat_history:
+                    if isinstance(msg, dict):
+                        # Handle dictionary format
+                        history_context += f"User: {msg.get('input', '')}\n"
+                        history_context += f"Assistant: {msg.get('output', '')}\n"
+                    else:
+                        # Handle message object format
+                        content = msg.content if hasattr(msg, 'content') else str(msg)
+                        role = msg.type if hasattr(msg, 'type') else 'message'
+                        history_context += f"{role}: {content}\n"
+
         decomposition_prompt = f"""Analyze this query and break it down into simpler sub-queries if needed.
         If the query is already simple, return it as is.
         
         Query: {query}
+        {history_context}
         
         Format your response as a JSON array of sub-queries. Example:
         [
@@ -789,7 +919,12 @@ class QueryDecomposer:
         For simple queries, return a single-element array."""
 
         response = self.llm.invoke([HumanMessage(content=decomposition_prompt)])
-        sub_queries_data = json.loads(response.content)
+        
+        try:
+            sub_queries_data = json.loads(response.content)
+        except json.JSONDecodeError:
+            # Fallback if response is not valid JSON
+            sub_queries_data = [{"sub_query": query, "explanation": "Direct query"}]
         
         result = []
         for sub_query_info in sub_queries_data:
@@ -798,7 +933,7 @@ class QueryDecomposer:
                 'type': 'direct',
                 'query': sub_query_info['sub_query'],
                 'entities': entities,
-                'explanation': sub_query_info['explanation']
+                'explanation': sub_query_info.get('explanation', 'Direct query')
             })
         
         return result
@@ -1053,228 +1188,57 @@ Please ask me any question about your database!"""
         st.error(f"Failed to initialize database analyst: {str(e)}")
         return
 
-    # Chat interface with improved message display, redo option, and edit query
+    # Chat interface
     for idx, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"]):
             if message["role"] == "user":
-                # Add edit functionality for user queries
-                if f"edit_mode_{idx}" not in st.session_state:
-                    st.session_state[f"edit_mode_{idx}"] = False
-
-                if st.session_state[f"edit_mode_{idx}"]:
-                    # Show edit interface
-                    edited_query = st.text_area(
-                        "Edit your query:",
-                        value=message["content"],
-                        key=f"edit_query_{idx}"
-                    )
-                    col1, col2 = st.columns([1, 4])
-                    with col1:
-                        if st.button("Save & Run", key=f"save_edit_{idx}"):
-                            # Update the query
-                            st.session_state.messages[idx]["content"] = edited_query
-                            
-                            # Remove the old response
-                            if idx + 1 < len(st.session_state.messages) and st.session_state.messages[idx + 1]["role"] == "assistant":
-                                st.session_state.messages.pop(idx + 1)
-                            
-                            # Run new analysis
-                            with st.spinner("Running new analysis..."):
-                                try:
-                                    result = analyst.process_query(edited_query)
-                                    if result["success"]:
-                                        response = "🎯 Results for edited query:\n\n"
-                                        for metric, value in result['metrics'].items():
-                                            response += f"**{metric}**: {value}\n"
-                                    else:
-                                        response = f"❌ Error: {result.get('error', 'Unknown error')}"
-                                    
-                                    # Insert new response
-                                    st.session_state.messages.insert(idx + 1, {
-                                        "role": "assistant",
-                                        "content": response
-                                    })
-                                    
-                                    # Save chat
-                                    chat_manager.save_chat(
-                                        st.session_state.current_chat_id,
-                                        st.session_state.messages
-                                    )
-                                    
-                                    # Exit edit mode
-                                    st.session_state[f"edit_mode_{idx}"] = False
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Error processing edited query: {str(e)}")
-                    
-                    with col2:
-                        if st.button("Cancel", key=f"cancel_edit_{idx}"):
-                            st.session_state[f"edit_mode_{idx}"] = False
-                            st.rerun()
-                else:
-                    # Show normal query with edit button
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.markdown(message["content"])
-                    with col2:
-                        if st.button("✏️ Edit", key=f"edit_{idx}"):
-                            st.session_state[f"edit_mode_{idx}"] = True
-                            st.rerun()
-                st.caption("Question")
-            else:
-                # Show assistant messages normally
                 st.markdown(message["content"])
-                
-                if message["role"] == "assistant":
-                    # Create columns for action buttons
-                    col1, col2 = st.columns([1, 4])
-                    
-                    with col1:
-                        if st.button("🔄 Redo", key=f"redo_{idx}", help="Redo this analysis with fresh results"):
-                            # Get the corresponding user query
-                            user_query = None
-                            for i in range(idx, -1, -1):
-                                if st.session_state.messages[i]["role"] == "user":
-                                    user_query = st.session_state.messages[i]["content"]
-                                    break
-                            
-                            if user_query:
-                                with st.spinner("🔄 Redoing analysis..."):
-                                    try:
-                                        # Redo analysis with cleared cache
-                                        result = analyst.redo_analysis(user_query, clear_cache=True)
-                                        
-                                        if result["success"]:
-                                            # Store the original response
-                                            original_response = message["content"]
-                                            
-                                            # Create new response
-                                            new_response = "🔄 **New Analysis Results:**\n\n"
-                                            for metric, value in result['metrics'].items():
-                                                new_response += f"**{metric}**: {value}\n"
-                                            new_response += f"\n\n_Reanalyzed at: {datetime.now().strftime('%H:%M:%S')}_"
-                                            
-                                            # Create combined response with original and new results
-                                            combined_response = (
-                                                "📊 **Original Analysis:**\n\n"
-                                                f"{original_response}\n\n"
-                                                "---\n\n"  # Separator
-                                                f"{new_response}"
-                                            )
-                                            
-                                            # Update the message content
-                                            st.session_state.messages[idx]["content"] = combined_response
-                                            
-                                            # Add comparison note if results differ
-                                            if original_response != new_response:
-                                                st.info("💡 The results have changed from the original analysis.")
-                                            
-                                            # Save chat after reanalysis
-                                            chat_manager.save_chat(
-                                                st.session_state.current_chat_id,
-                                                st.session_state.messages
-                                            )
-                                            st.rerun()
-                                        else:
-                                            st.error(f"Redo failed: {result.get('error', 'Unknown error')}")
-                                    except Exception as e:
-                                        st.error(f"Error during reanalysis: {str(e)}")
-                    
-                    with col2:
-                        # Show analysis information
-                        if "Original Analysis:" in message["content"]:
-                            st.caption("Contains original and reanalyzed results")
-                
-                if idx > 0 and st.session_state.messages[idx-1]["role"] == "user":
-                    st.caption("Follow-up available ↓")
+            else:
+                # For assistant messages, use the formatted output
+                if isinstance(message.get("content"), dict):
+                    # If it's a result dictionary, format it
+                    formatted_output = analyst.format_output(message["content"])
+                    st.markdown(formatted_output)
+                else:
+                    # For regular messages
+                    st.markdown(message["content"])
 
-    # Add a redo button for the entire conversation with comparison
-    if st.session_state.messages and len(st.session_state.messages) > 1:
-        if st.sidebar.button("🔄 Redo Entire Analysis", help="Redo all queries in this conversation"):
-            with st.spinner("Redoing entire analysis..."):
-                try:
-                    new_messages = [st.session_state.messages[0]]  # Keep the welcome message
-                    
-                    # Redo each query in the conversation
-                    for idx, message in enumerate(st.session_state.messages[1:]):
-                        if message["role"] == "user":
-                            # Add the user message
-                            new_messages.append(message)
-                            
-                            # Get original response if it exists
-                            original_response = None
-                            if idx + 2 < len(st.session_state.messages):
-                                original_response = st.session_state.messages[idx + 2]["content"]
-                            
-                            # Redo the analysis
-                            result = analyst.redo_analysis(message["content"], clear_cache=True)
-                            
-                            if result["success"]:
-                                if original_response:
-                                    response = (
-                                        "📊 **Original Analysis:**\n\n"
-                                        f"{original_response}\n\n"
-                                        "---\n\n"
-                                        "🔄 **New Analysis Results:**\n\n"
-                                    )
-                                else:
-                                    response = "🔄 **Analysis Results:**\n\n"
-                                
-                                for metric, value in result['metrics'].items():
-                                    response += f"**{metric}**: {value}\n"
-                                response += f"\n\n_Reanalyzed at: {datetime.now().strftime('%H:%M:%S')}_"
-                            else:
-                                response = f"❌ Error: {result.get('error', 'Unknown error')}"
-                            
-                            # Add the assistant response
-                            new_messages.append({
-                                "role": "assistant",
-                                "content": response
-                            })
-                    
-                    # Update messages and save
-                    st.session_state.messages = new_messages
-                    chat_manager.save_chat(
-                        st.session_state.current_chat_id,
-                        st.session_state.messages
-                    )
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error during complete reanalysis: {str(e)}")
-
-    # Chat input with automatic saving
-    if prompt := st.chat_input("Ask me about your database...", key="chat_input"):
+    # Query input
+    if query := st.chat_input("Ask a question about your data"):
         # Add user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.messages.append({"role": "user", "content": query})
         
-        with st.chat_message("assistant"):
-            with st.spinner("Analyzing..."):
-                try:
-                    # Process query with context
-                    context = None
-                    if len(st.session_state.messages) > 2:  # If there's previous conversation
-                        context = st.session_state.messages[-3]["content"] if len(st.session_state.messages) >= 3 else None
-                    
-                    result = analyst.process_query(prompt)
-                    
-                    if result["success"]:
-                        response = "🎯 Here are the results:\n\n"
-                        for metric, value in result['metrics'].items():
-                            response += f"**{metric}**: {value}\n"
-                    else:
-                        response = f"❌ Error: {result.get('error', 'Unknown error')}"
-                    
-                    st.markdown(response)
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-                    
-                    # Save chat after each interaction
-                    chat_manager.save_chat(
-                        st.session_state.current_chat_id,
-                        st.session_state.messages
-                    )
-                    
-                except Exception as e:
-                    st.error(f"An error occurred: {str(e)}")
+        # Process query and get results
+        with st.spinner("Analyzing..."):
+            try:
+                results = analyst.process_query(query)
+                
+                # Format the results using the format_output method
+                formatted_output = analyst.format_output(results)
+                
+                # Add assistant message with both raw results and formatted output
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": formatted_output  # Store the formatted string directly
+                })
+                
+                # Save chat
+                chat_manager.save_chat(
+                    st.session_state.current_chat_id,
+                    st.session_state.messages
+                )
+                
+                # Display the formatted output
+                with st.chat_message("assistant"):
+                    st.markdown(formatted_output)
+                
+            except Exception as e:
+                error_msg = f"Error processing query: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": f"❌ {error_msg}"
+                })
 
 if __name__ == "__main__":
     main()

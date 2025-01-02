@@ -1,0 +1,20 @@
+{
+  "id": "581094f7-5433-4dfc-8d62-6b5550d4d9ba",
+  "title": "give me the distribution of department expenses fo...",
+  "first_query": "give me the distribution of department expenses for residence in westshore stamps\n\n\n",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "👋 Hello! I'm your SQL Database Analysis Assistant. \n\nI can help you analyze your database by:\n- Running SQL queries\n- Providing data insights\n- Answering follow-up questions about the results\n\nPlease ask me any question about your database!"
+    },
+    {
+      "role": "user",
+      "content": "give me the distribution of department expenses for residence in westshore stamps\n\n\n"
+    },
+    {
+      "role": "assistant",
+      "content": "❌ Error: Query processing error: Selected table 'expenses' not found in metadata"
+    }
+  ],
+  "timestamp": "2025-01-02T13:34:14.519526"
+}

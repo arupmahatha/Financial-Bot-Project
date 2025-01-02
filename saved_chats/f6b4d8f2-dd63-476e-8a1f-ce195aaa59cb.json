@@ -45,8 +45,8 @@
     },
     {
       "role": "assistant",
-      "content": "🎯 Here are the results:\n\n"
+      "content": "📊 **Original Analysis:**\n\n📊 **Original Analysis:**\n\n📊 **Original Analysis:**\n\n🎯 Here are the results:\n\n\n\n---\n\n🔄 **New Analysis Results:**\n\n**raw_data**: [{'SQL_Account_Category_Order': 'Total Department Expense', 'Total_Expense': 11873346.029999997}, {'SQL_Account_Category_Order': 'Room Expense', 'Total_Expense': 7088986.089999996}, {'SQL_Account_Category_Order': 'F&B Expense', 'Total_Expense': 4712766.239999999}, {'SQL_Account_Category_Order': 'Other Expense', 'Total_Expense': 71635.90000000002}]\n**summary**: {'total_records': 4, 'columns': ['SQL_Account_Category_Order', 'Total_Expense']}\n\n\n_Reanalyzed at: 13:38:43_\n\n---\n\n🔄 **New Analysis Results:**\n\n**raw_data**: [{'SQL_Account_Category_Order': 'Total Department Expense', 'Total_Expense': 11873346.029999997}, {'SQL_Account_Category_Order': 'Room Expense', 'Total_Expense': 7088986.089999996}, {'SQL_Account_Category_Order': 'F&B Expense', 'Total_Expense': 4712766.239999999}, {'SQL_Account_Category_Order': 'Other Expense', 'Total_Expense': 71635.90000000002}]\n**summary**: {'total_records': 4, 'columns': ['SQL_Account_Category_Order', 'Total_Expense']}\n\n\n_Reanalyzed at: 13:41:59_\n\n---\n\n🔄 **New Analysis Results:**\n\n**raw_data**: [{'SQL_Account_Category_Order': 'Total Department Expense', 'Total_Expense': 11873346.029999997}, {'SQL_Account_Category_Order': 'Room Expense', 'Total_Expense': 7088986.089999996}, {'SQL_Account_Category_Order': 'F&B Expense', 'Total_Expense': 4712766.239999999}, {'SQL_Account_Category_Order': 'Other Expense', 'Total_Expense': 71635.90000000002}]\n**summary**: {'total_records': 4, 'columns': ['SQL_Account_Category_Order', 'Total_Expense']}\n\n\n_Reanalyzed at: 14:29:24_"
     }
   ],
-  "timestamp": "2025-01-02T02:17:50.510861"
+  "timestamp": "2025-01-02T14:55:03.883590"
 }
