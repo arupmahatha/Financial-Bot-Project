@@ -12,6 +12,7 @@ numpy
 
 # Database
 sqlalchemy
+diskcache
 
 # Typing and utilities
 typing-extensions
