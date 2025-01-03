@@ -24,3 +24,6 @@ tqdm
 sentence-transformers
 torch
 transformers
+
+# NLTK
+nltk>=3.8.1
