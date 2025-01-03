@@ -19,3 +19,8 @@ python-dotenv
 
 # Optional but recommended
 tqdm
+
+# Sentence transformers
+sentence-transformers
+torch
+transformers
